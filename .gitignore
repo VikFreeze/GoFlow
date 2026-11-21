@@ -1,0 +1,20 @@
+# Go build artifacts
+/goflow
+*.exe
+*.test
+*.out
+
+# Local runtime config (certs, sessions, routes written at runtime)
+.goflow/
+*.pem
+*.key
+
+# Environment files (never commit secrets)
+.env
+.env.*
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
