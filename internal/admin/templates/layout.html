@@ -1,0 +1,91 @@
+{{define "css"}}
+:root {
+  --bg: #0f1419; --fg: #e6edf3; --muted: #8b949e; --card: #161b22;
+  --border: #30363d; --accent: #2f81f7; --err: #f85149; --ok: #3fb950;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.topbar {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.topbar .brand { font-weight: 600; }
+.topbar nav { display: flex; gap: 1rem; flex: 1; }
+.topbar .right { margin-left: auto; }
+main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.25rem;
+}
+.card.narrow { max-width: 380px; margin: 10vh auto 0; }
+h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+input, textarea, select {
+  width: 100%; padding: 0.5rem 0.6rem; margin: 0.15rem 0 0.9rem;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 6px; font: inherit;
+}
+label { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+button, .btn {
+  display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--border);
+  background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer;
+  font: inherit;
+}
+button.secondary, .btn.secondary { background: transparent; color: var(--fg); }
+button.danger { background: var(--err); }
+.error {
+  background: rgba(248, 81, 73, 0.15); border: 1px solid var(--err);
+  color: var(--err); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem;
+}
+.ok {
+  background: rgba(63, 185, 80, 0.15); border: 1px solid var(--ok);
+  color: var(--ok); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem;
+}
+.muted { color: var(--muted); }
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.chip {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+  background: rgba(47, 129, 247, 0.15); color: var(--accent); font-size: 0.75rem; margin-right: 0.25rem;
+}
+.logbox {
+  background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.8rem;
+  max-height: 420px; overflow: auto; white-space: pre;
+}
+.status-2, .status-1 { color: var(--ok); }
+.status-3 { color: var(--accent); }
+.status-4 { color: #d29922; }
+.status-5 { color: var(--err); }
+{{end}}
+
+{{define "topbar"}}
+<div class="topbar">
+  <span class="brand">GoFlow</span>
+  <nav>
+    <a href="/admin/routes">Routes</a>
+    <a href="/admin/logs">Logs</a>
+  </nav>
+  <div class="right">
+    <button class="secondary" onclick="document.getElementById('reload-form').submit()">Reload</button>
+    <form id="reload-form" method="post" action="/admin/reload" style="display:none"></form>
+    <a href="/admin/logout" onmouseover="confirmLogout()" class="btn secondary" id="logout" style="border:1px solid var(--border);padding:0.35rem 0.75rem;display:inline-block">Sign out</a>
+  </div>
+</div>
+<script>
+function confirmLogout() {
+  var f = document.createElement('form');
+  f.method = 'post'; f.action = '/admin/logout';
+  document.body.appendChild(f); f.submit();
+}
+</script>
+{{end}}

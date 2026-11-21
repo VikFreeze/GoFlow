@@ -1,0 +1,21 @@
+{{define "login"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoFlow — sign in</title>
+  <style>{{template "css" .}}</style>
+</head>
+<body>
+  <main class="card narrow">
+    <h1>GoFlow</h1>
+    <p class="muted">Sign in to manage routes.</p>
+    {{if .error}}<div class="error">{{.error}}</div>{{end}}
+    <form method="post" action="/admin/login">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autofocus required>
+      <button type="submit">Sign in</button>
+    </form>
+  </main>
+</body>
+</html>{{end}}

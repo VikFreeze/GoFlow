@@ -1,0 +1,15 @@
+{{define "error"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>GoFlow — error</title>
+  <style>{{template "css" .}}</style>
+</head>
+<body>
+  <main class="card narrow" style="margin-top: 10vh">
+    <h1>Something went wrong</h1>
+    <div class="error">{{.error}}</div>
+    <p><a href="/admin/routes">Back to routes</a></p>
+  </main>
+</body>
+</html>{{end}}

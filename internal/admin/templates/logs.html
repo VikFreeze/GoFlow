@@ -1,0 +1,54 @@
+{{define "logs"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoFlow — logs</title>
+  <style>{{template "css" .}}</style>
+</head>
+<body>
+  {{template "topbar" .}}
+  <main>
+    <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
+      <h2>Live request log</h2>
+      <button class="secondary" onclick="location.reload()">Refresh</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Method</th><th>Host</th><th>Path</th><th>Route</th><th>Backend</th><th>Client</th><th>Status</th><th>ms</th><th></th></tr>
+        </thead>
+        <tbody>
+        {{range .Entries}}
+          <tr>
+            <td class="muted">{{.Time}}</td>
+            <td>{{.Method}}</td>
+            <td class="mono">{{.Host}}</td>
+            <td class="mono">{{.Path}}</td>
+            <td>{{.Route}}</td>
+            <td class="mono">{{.Backend}}</td>
+            <td class="mono">{{.Client}}</td>
+            <td><span class="{{statusClass .Status}}">{{.Status}}</span></td>
+            <td>{{.LatencyMS}}</td>
+            <td>
+              {{if .WebSocket}}<span class="chip">ws</span>{{end}}
+              {{if .Redirect}}<span class="chip">301</span>{{end}}
+              {{if .Denied}}<span class="chip">denied</span>{{end}}
+            </td>
+          </tr>
+        {{else}}
+          <tr><td colspan="10" class="muted">No requests logged yet.</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:0.75rem">
+      Auto-refreshes every 3s. This view is served from an in-memory ring buffer.
+    </p>
+  </main>
+  <script>
+    setTimeout(function(){ location.reload(); }, 3000);
+  </script>
+</body>
+</html>
+{{end}}

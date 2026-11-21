@@ -1,0 +1,48 @@
+{{define "routes"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoFlow — routes</title>
+  <style>{{template "css" .}}</style>
+</head>
+<body>
+  {{template "topbar" .}}
+  <main>
+    <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
+      <h2>Routes</h2>
+      <a class="btn" href="/admin/routes/new">Add route</a>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Hosts</th><th>Backend</th><th>Allowlist</th><th>TLS</th><th>HTTP→HTTPS</th><th></th></tr>
+        </thead>
+        <tbody>
+        {{range .Routes}}
+          <tr>
+            <td class="mono">{{.Name}}</td>
+            <td>
+              {{range .Hosts}}<span class="chip">{{.}}</span>{{end}}
+            </td>
+            <td class="mono">{{.Backend}}</td>
+            <td class="mono">{{if .Allowlist}}{{join .Allowlist ", "}}{{else}}<span class="muted">any</span>{{end}}</td>
+            <td>{{if .ACME}}<span class="chip">acme</span>{{else if .TLSCertFile}}<span class="chip">pem</span>{{else}}<span class="muted">none</span>{{end}}</td>
+            <td>{{if .RedirectHTTP}}yes{{else}}<span class="muted">no</span>{{end}}</td>
+            <td class="row">
+              <a class="btn secondary" href="/admin/routes/{{.Name}}/edit">Edit</a>
+              <form method="post" action="/admin/routes/{{.Name}}/delete"
+                    onsubmit="return confirm('Delete route {{.Name}}?')">
+                <button type="submit" class="danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {{else}}
+          <tr><td colspan="7" class="muted">No routes yet. <a href="/admin/routes/new">Add one</a>.</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>{{end}}
