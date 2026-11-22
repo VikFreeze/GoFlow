@@ -1,0 +1,14 @@
+.git
+.gitignore
+*.md
+docs/
+.goflow/
+goflow/
+certs/
+*.crt
+*.key
+*.pem
+.env
+Dockerfile
+docker-compose.yml
+.github/

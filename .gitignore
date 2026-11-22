@@ -18,3 +18,6 @@
 .idea/
 *.swp
 .DS_Store
+
+# Local TLS cert drop dir (compose mounts it; contents are secrets)
+certs/

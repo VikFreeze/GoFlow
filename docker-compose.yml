@@ -1,0 +1,34 @@
+services:
+  goflow:
+    build:
+      context: .
+      args:
+        VERSION: ${GOFLOW_VERSION:-dev}
+    image: goflow:local
+    container_name: goflow
+    ports:
+      # Host port : container port — remap to 80/443 behind a firewall,
+      # or run with published ports 8080/8443 for local testing.
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      # REQUIRED at first start. Never put the real value in this file or
+      # in git — export it in the shell (or a .env that is git-ignored).
+      GOFLOW_ADMIN_PASSWORD: ${GOFLOW_ADMIN_PASSWORD:?set GOFLOW_ADMIN_PASSWORD in the environment or a git-ignored .env}
+      # ACME (Let's Encrypt) — enable only when you have a public domain.
+      # GOFLOW_ACME_EMAIL: ${GOFLOW_ACME_EMAIL:-}
+    volumes:
+      # Persistent config: routes.json, admin.hash, certs/, ACME state.
+      - goflow-config:/config
+      # Drop real PEM certs here to serve HTTPS per route, e.g.
+      # certs/registry.dev.test.crt / .key for host registry.dev.test
+      - ./certs:/config/certs:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  goflow-config:
