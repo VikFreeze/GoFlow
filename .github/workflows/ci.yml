@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "gofmt -l reported files that need formatting:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t goflow:ci .
+
+      - name: Smoke-test image (serves /healthz)
+        run: |
+          # Throwaway runtime-generated password: never a fixed value in this file.
+          PW=$(openssl rand -hex 16)
+          docker run -d --name goflow-smoke -e GOFLOW_ADMIN_PASSWORD="$PW" \
+            -p 18080:8080 goflow:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/healthz; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/healthz
+          docker logs goflow-smoke | tail -20
+          docker rm -f goflow-smoke >/dev/null
