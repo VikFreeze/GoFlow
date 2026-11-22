@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -214,7 +215,7 @@ func (a *App) recentRequests(n int) []admin.ProxyEntry {
 }
 
 // Router returns the root HTTP handler: /healthz, ACME challenge (if an
-// issuer is present), /admin subtree, and everything else to the proxy.
+// issuer is present), the /admin subtree, and everything else to the proxy.
 func (a *App) Router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -225,9 +226,26 @@ func (a *App) Router() http.Handler {
 		mux.HandleFunc("GET /.well-known/acme-challenge/{token}", a.handleACMEChallenge)
 	}
 	if a.admin != nil {
-		mux.Handle("/admin/", a.admin.Handler())
+		// The admin's internal patterns are written relative to its own
+		// root (/routes, /api/...), while the browser sees /admin/routes.
+		// Serve the admin only for /admin and /admin/..., stripping the
+		// prefix; anything else falls through to the proxy.
+		inner := a.admin.Handler()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/admin" || strings.HasPrefix(r.URL.Path, "/admin/") {
+				r2 := r.Clone(r.Context())
+				r2.URL.Path = strings.TrimPrefix(r.URL.Path, "/admin")
+				if r2.URL.Path == "" {
+					r2.URL.Path = "/"
+				}
+				inner.ServeHTTP(w, r2)
+				return
+			}
+			a.proxy.ServeHTTP(w, r)
+		})
+	} else {
+		mux.HandleFunc("/", a.proxy.ServeHTTP)
 	}
-	mux.HandleFunc("/", a.proxy.ServeHTTP)
 	return mux
 }
 
