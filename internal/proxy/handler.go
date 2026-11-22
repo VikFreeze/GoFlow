@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -99,16 +100,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cw := &captureWriter{ResponseWriter: w}
 	rp.ServeHTTP(cw, r)
 
+	// A WebSocket upgrade is detected from the request headers: Go's HTTP
+	// server writes the 101 response straight to the connection (bypassing
+	// WriteHeader), so the response status is not observable here.
+	ws := isWebSocketUpgrade(r) || cw.isWebSocket()
+	status := cw.status
+	if ws && status == 0 {
+		status = http.StatusSwitchingProtocols
+	}
+
 	entry := Entry{
 		Method:    r.Method,
 		Host:      host,
 		Path:      r.URL.RequestURI(),
 		Backend:   route.Backend,
 		Client:    ipStr(client),
-		Status:    cw.status,
+		Status:    status,
 		LatencyMS: ms(start),
 		Route:     route.Name,
-		WebSocket: cw.isWebSocket(),
+		WebSocket: ws,
 	}
 	h.log.Add(entry)
 	if entry.Status >= 500 {
@@ -202,4 +212,24 @@ func (c *captureWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func (c *captureWriter) isWebSocket() bool {
 	return c.status == http.StatusSwitchingProtocols
+}
+
+// isWebSocketUpgrade reports whether the request asks for a WebSocket
+// protocol upgrade. The response-side 101 is not visible to the proxy (the
+// server writes it directly to the connection), so the request headers are
+// the reliable signal for logging.
+func isWebSocketUpgrade(r *http.Request) bool {
+	if !headerHasValue(r.Header, "Upgrade", "websocket") {
+		return false
+	}
+	return headerHasValue(r.Header, "Connection", "Upgrade")
+}
+
+func headerHasValue(h http.Header, key, want string) bool {
+	for _, v := range h[http.CanonicalHeaderKey(key)] {
+		if strings.EqualFold(strings.TrimSpace(v), want) {
+			return true
+		}
+	}
+	return false
 }

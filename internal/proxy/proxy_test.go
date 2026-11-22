@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/VikFreeze/goflow/internal/config"
 )
@@ -361,4 +362,72 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 			t.Error("WAN ip should be denied after restart")
 		}
 	}
+}
+
+// TestWebSocketUpgradeIsLogged asserts that a completed WebSocket upgrade
+// shows up in the request log with WebSocket=true and Status=101. Go's HTTP
+// server writes the 101 directly to the connection (bypassing WriteHeader),
+// so this guards the request-header detection path.
+func TestWebSocketUpgradeIsLogged(t *testing.T) {
+	// Raw TCP backend: answer the upgrade with a 101, then echo one frame.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		buf := make([]byte, 4096)
+		if _, err := conn.Read(buf); err != nil {
+			return
+		}
+		conn.Write([]byte("HTTP/1.1 101 Switching Protocols\r\n" +
+			"Upgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
+		conn.Write([]byte{0x42})
+	}()
+
+	cfg := &config.Config{Routes: []config.Route{
+		{Name: "ws", Hosts: []string{"ws.example.com"}, Backend: ln.Addr().String()},
+	}}
+	lg := NewLog(16)
+	h := NewHandler(NewMatcher(cfg), lg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	front := httptest.NewServer(h)
+	defer front.Close()
+
+	conn, err := net.Dial("tcp", front.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	fmt.Fprintf(conn, "GET /ws HTTP/1.1\r\nHost: ws.example.com\r\n"+
+		"Upgrade: websocket\r\nConnection: Upgrade\r\n"+
+		"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, nil)
+	if err != nil {
+		t.Fatalf("read 101: %v", err)
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("status %d, want 101", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	for i := 0; i < 50; i++ {
+		if es := lg.Snapshot(4); len(es) > 0 && es[0].WebSocket {
+			e := es[0]
+			if e.Status != http.StatusSwitchingProtocols {
+				t.Errorf("logged status %d, want 101", e.Status)
+			}
+			if e.Route != "ws" {
+				t.Errorf("route %q, want ws", e.Route)
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("websocket upgrade was not logged with WebSocket=true")
 }
