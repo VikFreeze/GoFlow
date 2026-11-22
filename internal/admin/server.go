@@ -19,11 +19,12 @@ var tplFS embed.FS
 
 // Deps are the pieces of GoFlow the admin surface drives.
 type Deps struct {
-	Auth     *Auth
-	Load     func() (*config.Config, error) // current config
-	Save     func(*config.Config) error     // persist + hot-reload
-	Reload   func() error                   // re-read from disk
-	Requests func(int) []ProxyEntry         // recent request log (newest first)
+	Auth      *Auth
+	Load      func() (*config.Config, error) // current config
+	Save      func(*config.Config) error     // persist + hot-reload
+	Reload    func() error                   // re-read from disk
+	Requests  func(int) []ProxyEntry         // recent request log (newest first)
+	ConfigDir string                         // base dir for relative cert paths
 }
 
 // ProxyEntry mirrors proxy.Entry without importing proxy (keeps the admin
@@ -313,7 +314,7 @@ func (s *Server) apiUpsertRoute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidateIn(s.deps.ConfigDir); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
@@ -392,7 +393,7 @@ func (s *Server) applyRouteForm(cfg *config.Config, r *http.Request) error {
 	if err := upsertRoute(cfg, rt); err != nil {
 		return err
 	}
-	return cfg.Validate()
+	return cfg.ValidateIn(s.deps.ConfigDir)
 }
 
 func splitCSV(s string) []string {

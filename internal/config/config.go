@@ -97,8 +97,27 @@ func allDigits(s string) bool {
 }
 
 // Validate checks a single route for correctness, returning a descriptive
-// error on the first problem found.
+// error on the first problem found. Relative TLS cert paths are resolved
+// against the process working directory; use ValidateIn to anchor them at
+// the config directory instead.
 func (r Route) Validate() error {
+	if err := r.validateCommon(); err != nil {
+		return err
+	}
+	return r.checkCertFiles("")
+}
+
+// ValidateIn is like Validate but resolves relative TLS cert paths against
+// baseDir (the config directory) rather than the working directory.
+func (r Route) ValidateIn(baseDir string) error {
+	if err := r.validateCommon(); err != nil {
+		return err
+	}
+	return r.checkCertFiles(baseDir)
+}
+
+// validateCommon checks every field except TLS cert file existence.
+func (r Route) validateCommon() error {
 	if strings.TrimSpace(r.Name) == "" {
 		return fmt.Errorf("route: name is required")
 	}
@@ -130,13 +149,29 @@ func (r Route) Validate() error {
 			return fmt.Errorf("route %q: bad allowlist entry %q: %w", r.Name, cidr, err)
 		}
 	}
-	// TLS cert files, when set explicitly (and ACME off), must exist.
-	if r.TLSCertFile != "" && r.TLSKeyFile != "" && !r.ACME {
-		if _, err := os.Stat(r.TLSCertFile); err != nil {
-			return fmt.Errorf("route %q: cert file: %w", r.Name, err)
+	return nil
+}
+
+// checkCertFiles ensures declared TLS cert files exist, resolving relative
+// paths against baseDir (empty = current working directory).
+func (r Route) checkCertFiles(baseDir string) error {
+	if r.TLSCertFile == "" && r.TLSKeyFile == "" {
+		return nil
+	}
+	if r.TLSCertFile == "" || r.TLSKeyFile == "" {
+		return fmt.Errorf("route %q: tlsCertFile and tlsKeyFile must be set together", r.Name)
+	}
+	if r.ACME {
+		// ACME manages the cert; nothing to check on disk.
+		return nil
+	}
+	for _, f := range []string{r.TLSCertFile, r.TLSKeyFile} {
+		p := f
+		if !filepath.IsAbs(p) && baseDir != "" {
+			p = filepath.Join(baseDir, p)
 		}
-		if _, err := os.Stat(r.TLSKeyFile); err != nil {
-			return fmt.Errorf("route %q: key file: %w", r.Name, err)
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("route %q: cert file %q: %w", r.Name, f, err)
 		}
 	}
 	return nil
@@ -195,10 +230,15 @@ func (r Route) Allowed(clientIP net.IP) bool {
 // Validate checks the whole config and rejects duplicate route names or
 // duplicate hostnames across routes.
 func (c *Config) Validate() error {
+	return c.ValidateIn("")
+}
+
+// ValidateIn is like Validate but anchors relative TLS cert paths at baseDir.
+func (c *Config) ValidateIn(baseDir string) error {
 	nameSeen := map[string]bool{}
 	hostSeen := map[string]string{}
 	for _, r := range c.Routes {
-		if err := r.Validate(); err != nil {
+		if err := r.ValidateIn(baseDir); err != nil {
 			return err
 		}
 		if nameSeen[r.Name] {
@@ -230,7 +270,8 @@ func Load(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-	if err := c.Validate(); err != nil {
+	// Anchor relative TLS cert paths at the config file's directory.
+	if err := c.ValidateIn(filepath.Dir(path)); err != nil {
 		return nil, err
 	}
 	return &c, nil

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -165,5 +167,54 @@ func TestSaveAtomicNoLeftoverTmp(t *testing.T) {
 	entries, _ := filepath.Glob(filepath.Join(dir, ".goflow-*.tmp"))
 	if len(entries) != 0 {
 		t.Errorf("leftover temp files: %v", entries)
+	}
+}
+
+func TestCertPathsResolveRelativeToConfigFileDir(t *testing.T) {
+	dir := t.TempDir()
+	certDir := filepath.Join(dir, "certs")
+	if err := os.MkdirAll(certDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Write throwaway PEMs with the right shape so tls.X509KeyPair is not
+	// involved (Validate only stats the files).
+	for _, name := range []string{"c.crt", "c.key"} {
+		if err := os.WriteFile(filepath.Join(certDir, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := &Config{Routes: []Route{{
+		Name:        "tls",
+		Hosts:       []string{"t.example.com"},
+		Backend:     "127.0.0.1:9",
+		TLSCertFile: filepath.Join("certs", "c.crt"),
+		TLSKeyFile:  filepath.Join("certs", "c.key"),
+	}}}
+	p := filepath.Join(dir, "routes.json")
+	if err := c.Save(p); err != nil {
+		t.Fatalf("save (validates against file dir): %v", err)
+	}
+	got, err := Load(p)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(got.Routes) != 1 || got.Routes[0].TLSCertFile != filepath.Join("certs", "c.crt") {
+		t.Fatalf("unexpected loaded config: %+v", got)
+	}
+
+	// A missing cert must fail when anchored at the config dir.
+	// A missing cert must fail at Load time (Load validates against the
+	// file's directory). Write the JSON directly: Config.Save itself does
+	// not validate, the App/admin layer does.
+	bad := &Config{Routes: []Route{{
+		Name: "bad", Hosts: []string{"b.example.com"}, Backend: "127.0.0.1:9",
+		TLSCertFile: filepath.Join("certs", "nope.crt"), TLSKeyFile: filepath.Join("certs", "c.key"),
+	}}}
+	data, _ := json.Marshal(bad)
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("expected load to fail for missing cert file")
 	}
 }

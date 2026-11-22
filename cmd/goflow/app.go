@@ -115,11 +115,12 @@ func NewApp(opts Options) (*App, error) {
 		opts.Logger.Warn("admin: generated a first-run password (logged once, never stored in plaintext)", "password", pw)
 	}
 	a.admin = admin.NewServer(admin.Deps{
-		Auth:     auth,
-		Load:     a.Load,
-		Save:     a.Save,
-		Reload:   a.Reload,
-		Requests: a.recentRequests,
+		Auth:      auth,
+		Load:      a.Load,
+		Save:      a.Save,
+		Reload:    a.Reload,
+		Requests:  a.recentRequests,
+		ConfigDir: opts.ConfigDir,
 	}, opts.Logger)
 
 	// ACME issuer (optional).
@@ -152,7 +153,7 @@ func (a *App) Load() (*config.Config, error) {
 
 // Save validates, persists, and hot-applies a new config.
 func (a *App) Save(cfg *config.Config) error {
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidateIn(a.configDir); err != nil {
 		return err
 	}
 	if err := cfg.Save(a.cfgPath); err != nil {
